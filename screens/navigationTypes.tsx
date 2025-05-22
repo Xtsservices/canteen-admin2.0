@@ -12,7 +12,7 @@ export interface WorkerUser {
 }
 
 export interface CartItem {
-  
+
   id: number;
   name: string;
   price: number;
@@ -34,7 +34,7 @@ export type RootStackParamList = {
     menuPrice: number;
     menuCurrency: string;
   };
-  Walkin: undefined; 
+  Walkin: undefined;
   SettingsScreen: undefined;
   LoginScreen: undefined;
   ProfileScreen: undefined;
@@ -49,24 +49,24 @@ export type RootStackParamList = {
   MenuDetailsScreen: { menuId: number | string };
   MenuCard: undefined;
   CartScreen: undefined;
-  "[menuId]": undefined; 
+  "[menuId]": undefined;
   breakfast: undefined;
-  OrderDetails: { orderId: string }; 
-  MenuItemDetails: { 
-    menuId: number; 
+  OrderDetails: { orderId: string };
+  MenuItemDetails: {
+    menuId: number;
   };
   Users: { newUser?: { name: string; mobile: string; position?: string; address?: string } };
 
-  WorkerProfile: { 
-    
-    user:any 
+  WorkerProfile: {
+
+    user: any
   };
   AddUser: { onAddUser: (user: any) => void };
   Menu: undefined;
   Checkout: {
-    cart: CheckoutCartItem[];   
+    cart: CheckoutCartItem[];
     total: number;
-  };  
+  };
   Home: undefined;
   Login: undefined;
   Dashboard: { canteenId: string };
@@ -75,13 +75,18 @@ export type RootStackParamList = {
   ViewOrders: undefined;
   PaymentMethod: undefined;
   VerifyToken: undefined;
-  MenubyMenuId: {menuId: string};
+  MenubyMenuId: { menuId: string };
   orderhistory: undefined;
   MenuItemsByMenuId: { menuId: string };
-  Orders : undefined;
+  Orders: undefined;
   CallCenter: undefined;
   Payment: {
     cartId?: string;
     totalAmount?: number;
   };
+
+  MenuTestScreen: undefined;
+  PrinterConfiguration: undefined;
+  PrinterDriverInstaller: undefined;
+  SplashScreen: undefined;
 };

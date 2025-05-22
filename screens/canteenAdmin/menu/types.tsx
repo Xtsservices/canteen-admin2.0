@@ -124,11 +124,6 @@ export interface CartItemsState {
   };
 }
 
-
-// export interface MenuItemDetailsProps {
-//   navigation: any; // Replace `any` with the correct type if available
-// }
-
 export interface CartResponse {
   message: string;
   data: {

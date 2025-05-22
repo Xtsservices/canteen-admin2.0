@@ -15,6 +15,7 @@ import { RouteProp, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import Icon from 'react-native-vector-icons/Feather';
+import printQR from '../printQR/newQr';
 
 
 type PaymentScreenRouteProp = RouteProp<RootStackParamList, 'Payment'>;
@@ -69,7 +70,7 @@ const Payment: React.FC<PaymentScreenProps> = ({ route }) => {
           throw new Error('No authorization token found');
         }
 
-        const response = await fetch('http://10.0.2.2:3002/api/cart/getCart', {
+        const response = await fetch('https://server.welfarecanteen.in/api/cart/getCart', {
           headers: {
             'Content-Type': 'application/json',
             authorization: token,
@@ -137,7 +138,7 @@ const Payment: React.FC<PaymentScreenProps> = ({ route }) => {
         return;
       }
 
-      const response = await fetch('http://10.0.2.2:3002/api/order/placeOrder', {
+      const response = await fetch('https://server.welfarecanteen.in/api/order/placeOrder', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +176,7 @@ const Payment: React.FC<PaymentScreenProps> = ({ route }) => {
 
   const handlePrintAndNavigate = () => {
     handlePrint();
-    navigation.navigate('AdminDashboard');
+    // navigation.navigate('AdminDashboard');
   };
 
   const onRefresh = async () => {
@@ -188,7 +189,9 @@ const Payment: React.FC<PaymentScreenProps> = ({ route }) => {
   };
 
   const handlePrint = () => {
-    Alert.alert('Print', 'Receipt printed successfully!');
+    // Alert.alert('Print', 'Receipt printed successfully!');
+    printQR()
+
   };
 
   // Calculate total from items if not provided

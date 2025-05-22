@@ -1,153 +1,260 @@
-import React, {useState, useRef} from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Dimensions,
-  Platform,
-} from 'react-native';
-import {useNavigation, useIsFocused} from '@react-navigation/native';
-import {StackNavigationProp} from '@react-navigation/stack';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, Touchable, TouchableOpacity, Alert } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigationTypes';
+import RNPrint from 'react-native-print';
 
-type RootStackParamList = {
-  BluetoothControl: undefined;
+type PrintNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'PrinterConfiguration'
+>;
+
+type Props = {
+  route: {
+    params: {
+      token: string;
+      ordersWithItems: Array<{ [key: string]: any }>;
+      orderData: any;
+    };
+  };
 };
 
-type NavigationProp = StackNavigationProp<RootStackParamList, 'BluetoothControl'>;
+const VerifyTokenScreen = ({ route }: Props) => {
+  const navigation = useNavigation<PrintNavigationProp>();
+  const { token, ordersWithItems, orderData } = route.params;
 
-const {width, height} = Dimensions.get('window');
+  // Calculate total quantity and amount
+  const totalQuantity = ordersWithItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = ordersWithItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-const isTablet = width >= 768; // You can adjust this threshold if needed
+  const handleOnPress = () => {
+    const printContent = `
+      <html>
+      <head>
+        <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 10px;
+          font-size: 18px;
+        }
+        .header {
+          text-align: center;
+          font-size: 24px;
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        .section {
+          margin-bottom: 10px;
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+        }
+        .row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 4px;
+        }
+        .label {
+          font-weight: bold;
+        }
+        .value {
+          text-align: right;
+        }
+        </style>
+      </head>
+      <body>
 
-const VerifyTokenScreen = () => {
-  const [token, setToken] = useState<string[]>(Array(6).fill(''));
-  const navigation = useNavigation<NavigationProp>();
-  const inputRefs = useRef<(TextInput | null)[]>([]);
-  console.log('Token:', token);
+        <div class="section">
+        <h3>Order Summary</h3>
+        <div class="row">
+          <span class="label">Order ID:</span>
+          <span class="value">${orderData.id}</span>
+        </div>
+        <div class="row">
+          <span class="label">Status:</span>
+          <span class="value">${orderData.status}</span>
+        </div>
+        <div class="row">
+          <span class="label">Total Items:</span>
+          <span class="value">${totalQuantity}</span>
+        </div>
+        <div class="row">
+          <span class="label">Total Amount:</span>
+          <span class="value">₹${totalAmount}</span>
+        </div>
+        </div>
 
-  const handleTokenChange = (value: string, index: number) => {
-    const newToken = [...token];
-    newToken[index] = value;
-    setToken(newToken);
+        <div class="section">
+        <h3>Order Items</h3>
+        ${ordersWithItems
+      .map(
+        (item) => `
+          <div class="row">
+          <span class="label">Item:</span>
+          <span class="value">${item.itemName}</span>
+          </div>
+          <div class="row">
+          <span class="label">Quantity:</span>
+          <span class="value">${item.quantity}</span>
+          </div>
+          <div class="row">
+          <span class="label">Price:</span>
+          <span class="value">₹${item.price}</span>
+          </div>
+          <div class="row">
+          <span class="label">Subtotal:</span>
+          <span class="value">₹${item.price * item.quantity}</span>
+          </div>
+        `
+      )
+      .join('')}
+        </div>
+        <div class="section" style="text-align: center;">
+        <h3>Powered by Worldtek.in</h3>
+        <p>For any queries, please contact</p>
+        <a href="tel:+919167777777">+91 7893989898</a>
+        <div/>
+      </body>
+      </html>
+    `;
+    const handlePrint = async () => {
+      try {
+        await RNPrint.print({
+          html: printContent,
+        });
+      } catch (error) {
+        Alert.alert('Error', 'Failed to print the content.');
+      }
+    };
 
-    if (value && index < token.length - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleVerify = () => {
-    if (token.some(digit => digit === '')) {
-      Alert.alert('Error', 'Please fill in all token fields.');
-    } else {
-      Alert.alert('Success', 'Token verified successfully!');
-    }
-  };
-
-  const handleScanQRCode = () => {
-    if (useIsFocused()) {
-      navigation.navigate('BluetoothControl');
-    } else {
-      Alert.alert('Error', 'Camera is not accessible at the moment.');
-    }
+    handlePrint();
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Enter Token Number</Text>
+    <>
+      <ScrollView style={styles.container}>
+        <View style={styles.section}>
+          <Text style={[styles.header, { textAlign: 'center', fontSize: 20 }]}>Industrial NDY Canteen</Text>
+          <Text style={[styles.label, { textAlign: 'center', marginBottom: 8 }]}>Navel Dock Yard Canteens</Text>
+          <Text style={[styles.label, { textAlign: 'center', marginBottom: 16 }]}>Canteen Name: Annapurna Canteen</Text>
 
-      <View style={styles.tokenContainer}>
-        {token.map((digit, index) => (
-          <TextInput
-            key={index}
-            style={styles.tokenInput}
-            maxLength={1}
-            keyboardType="numeric"
-            value={digit}
-            onChangeText={value => handleTokenChange(value, index)}
-            ref={ref => {
-              inputRefs.current[index] = ref;
-            }}
-            onKeyPress={({nativeEvent}) => {
-              if (nativeEvent.key === 'Backspace' && index > 0 && !digit) {
-                inputRefs.current[index - 1]?.focus();
-              }
-            }}
-          />
-        ))}
-      </View>
+          <Text style={styles.header}>Order Summary</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>Order ID:</Text>
+            <Text style={styles.value}>{orderData.id}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Status:</Text>
+            <Text style={styles.value}>{orderData.status}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Total Items:</Text>
+            <Text style={styles.value}>{totalQuantity}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Total Amount:</Text>
+            <Text style={styles.value}>₹{totalAmount}</Text>
+          </View>
+        </View>
 
-      <Text style={styles.orText}>OR</Text>
+        <View style={styles.section}>
+          <Text style={styles.header}>Order Items</Text>
+          {ordersWithItems.map((item, index) => (
+            <View key={index} style={styles.itemContainer}>
+              <View style={styles.row}>
+                <Text style={styles.label}>Item:</Text>
+                <Text style={styles.value}>{item.itemName}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Quantity:</Text>
+                <Text style={styles.value}>{item.quantity}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Price:</Text>
+                <Text style={styles.value}>₹{item.price}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Subtotal:</Text>
+                <Text style={styles.value}>₹{item.price * item.quantity}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
 
-      <TouchableOpacity style={styles.scanButton} onPress={handleScanQRCode}>
-        <Text style={styles.scanButtonText}>SCAN QR CODE</Text>
+        <View style={styles.section}>
+          <Text style={styles.header}>QR Code Scanned</Text>
+          {ordersWithItems[0] && (
+            <Image
+              source={{ uri: ordersWithItems[0].qrCode }}
+              style={{ width: 300, height: 300, alignSelf: 'center', marginBottom: 12 }}
+            />
+          )}
+        </View>
+      </ScrollView>
+      <TouchableOpacity
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          backgroundColor: '#007BFF',
+          padding: 10,
+          borderRadius: 50,
+        }}
+        onPress={handleOnPress}
+      >
+        <Text style={{ color: 'white', fontSize: 16 }}>Confirm & Print</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
-        <Text style={styles.verifyButtonText}>Verify</Text>
-      </TouchableOpacity>
-    </View>
+    </>
+
+
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: isTablet ? width * 0.15 : width * 0.1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
   },
-  title: {
-    fontSize: isTablet ? 32 : 24,
+  section: {
+    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    elevation: 2,
+  },
+  header: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: isTablet ? 40 : 30,
+    marginBottom: 12,
+    color: '#333',
   },
-  tokenContainer: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: isTablet ? 40 : 30,
+    marginBottom: 8,
   },
-  tokenInput: {
-    width: isTablet ? 80 : 60,
-    height: isTablet ? 80 : 60,
-    borderWidth: 1,
-    borderColor: '#000',
-    textAlign: 'center',
-    fontSize: isTablet ? 30 : 24,
-    marginHorizontal: isTablet ? 15 : 10,
-    borderRadius: 10,
+  label: {
+    fontSize: 16,
+    color: '#666',
   },
-  orText: {
-    fontSize: isTablet ? 24 : 20,
-    fontWeight: 'bold',
-    marginVertical: isTablet ? 40 : 30,
+  value: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
   },
-  scanButton: {
-    backgroundColor: '#000080',
-    paddingVertical: isTablet ? 20 : 15,
-    paddingHorizontal: isTablet ? 40 : 30,
-    borderRadius: 10,
-    marginBottom: isTablet ? 40 : 30,
+  itemContainer: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  scanButtonText: {
-    color: '#fff',
-    fontSize: isTablet ? 20 : 18,
-    fontWeight: 'bold',
-  },
-  verifyButton: {
-    borderWidth: 1,
-    borderColor: '#000080',
-    paddingVertical: isTablet ? 20 : 15,
-    paddingHorizontal: isTablet ? 40 : 30,
-    borderRadius: 10,
-  },
-  verifyButtonText: {
-    color: '#000080',
-    fontSize: isTablet ? 20 : 18,
-    fontWeight: 'bold',
+  token: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'monospace',
   },
 });
 

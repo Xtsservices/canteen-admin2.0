@@ -68,7 +68,7 @@ const CartPage = () => {
 
       console.log('Request body:', body);
       const token = await AsyncStorage.getItem('authorization');
-      const API_BASE_URL = 'http://10.0.2.2:3002/api';
+      const API_BASE_URL = 'https://server.welfarecanteen.in/api';
       await axios.post(`${API_BASE_URL}/cart/updateCartItem`, body, {
         headers: {
           'Content-Type': 'application/json',

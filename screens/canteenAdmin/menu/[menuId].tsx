@@ -10,21 +10,21 @@ import {
   Alert,
   Dimensions,
   Image,
+  AppStateStatus,
+  AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { MenuDetails, CartData, CartItemsState, MenuItem, MenuItemDetailsScreenRouteProp } from './types';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { CartData, CartItemsState, MenuItem, MenuItemDetailsScreenRouteProp } from './types';
 import {
   formatTime,
   fetchCartData,
 } from './cartUtils';
 import { MenuItemDetailsProps } from './types';
 import { addItemToCart, updateCartItemQuantity, removeCartItem, findCartItemByItemId } from '../../services/cartHelpers';
-import { GiOgre } from 'react-icons/gi';
-interface CartItemInfo {
-  quantity: number;
-  cartItemId: number | string | null | undefined;
-}
+import { initializeDatabase } from '../../offline/database';
+import { getMenuItemsByIdOffline } from '../../offline/offlineApis/menuOfflineApis';
+import { getMenuItemsByMenuId } from '../../offline/models/menuItems';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = width >= 768 ? 3 : 1;
@@ -32,10 +32,8 @@ const ITEM_MARGIN = 12;
 const ITEM_WIDTH = (width - (ITEM_MARGIN * (COLUMN_COUNT + 1))) / COLUMN_COUNT;
 
 const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
-
   const route = useRoute<MenuItemDetailsScreenRouteProp>();
   const { menuId } = route.params;
-
   const [menuDetails, setMenuDetails] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +41,71 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
   const [cartItems, setCartItems] = useState<CartItemsState>({});
   const [updateLoading, setUpdateLoading] = useState<string | null>(null);
   const [cartUpdated, setCartUpdated] = useState(false);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [isDbInitialized, setIsDbInitialized] = useState(false);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await initializeDatabase();
+        setIsDbInitialized(true);
+        getOfflineMenuDetails();
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  // Function to check network connectivity using fetch
+  const checkNetworkConnectivity = async (): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch('https://www.google.com', {
+        method: 'HEAD',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.log('Network connectivity check failed:', error);
+      return false;
+    }
+  };
+
+  // Check connectivity and update state
+  const updateConnectivityStatus = async (): Promise<void> => {
+    try {
+      const isConnected = await checkNetworkConnectivity();
+      setIsOffline(!isConnected);
+      console.log('Connection status:', isConnected ? 'online' : 'offline');
+    } catch (error) {
+      console.error('Failed to update connectivity status:', error);
+      setIsOffline(true);
+    }
+  };
+
+  useEffect(() => {
+    updateConnectivityStatus();
+    const intervalId = setInterval(updateConnectivityStatus, 30000);
+    const appStateHandler = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        updateConnectivityStatus();
+      }
+    };
+    const appStateSubscription = AppState.addEventListener('change', appStateHandler);
+    // Clean up
+    return () => {
+      clearInterval(intervalId);
+      appStateSubscription.remove();
+    };
+  }, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -51,7 +114,11 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       if (menuId && isMounted) {
         try {
           setLoading(true);
-          await fetchMenuDetails();
+          if (isOffline) {
+            await getOfflineMenuDetails();
+          } else {
+            await fetchMenuDetails();
+          }
         } catch (error) {
           console.error('Error in initial fetch:', error);
         } finally {
@@ -69,6 +136,10 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
     };
   }, [menuId]);
 
+  useEffect(() => {
+    getOfflineMenuDetails();
+  }, [isOffline])
+
   // Fetch cart data when screen is focused or cart updated
   useFocusEffect(
     React.useCallback(() => {
@@ -76,10 +147,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
         try {
           const data = await fetchCartData();
           setCartData(data);
-
-          // Initialize an empty map for cart items
           const cartItemsMap: CartItemsState = {};
-
           if (data && data.cartItems && Array.isArray(data.cartItems)) {
             data.cartItems.forEach((cartItem: any) => {
               const itemIdKey = String(cartItem.itemId);
@@ -96,7 +164,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       };
 
       getCartData();
-    }, [cartUpdated])  // Depend on cartUpdated to refresh
+    }, [cartUpdated])
   );
 
   const fetchMenuDetails = async () => {
@@ -109,7 +177,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       }
 
       const response = await fetch(
-        `http://10.0.2.2:3002/api/menu/getMenuById?id=${menuId}`,
+        `https://server.welfarecanteen.in/api/menu/getMenuById?id=${menuId}`,
         {
           method: 'GET',
           headers: {
@@ -132,6 +200,20 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       setLoading(false);
     }
   };
+
+  const getOfflineMenuDetails = async () => {
+    console.log(menuId, 'menuId---getOfflineMenuDetails');
+    const offlineData = await getMenuItemsByIdOffline(menuId ? menuId : 1);
+    
+    console.log(offlineData, 'offlineData---getOfflineMenuDetails');
+
+    if (offlineData) {
+      setMenuDetails(offlineData?.data);
+      setError(null);
+    } else {
+      setError('Menu details not found');
+    }
+  }
 
   const handleAddToCart = async (item: any) => {
     try {
@@ -233,7 +315,6 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
     }
   };
 
-
   // Decrease item quantity
   const handleDecreaseQuantity = async (item: any) => {
     try {
@@ -242,7 +323,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       const itemId = item.item.id;
       const itemKey = String(itemId);
       console.log(itemKey, 'itemKey---decrease-quantity');
-      
+
 
       // Check if item exists in cart
       if (!cartItems[itemKey]) {
@@ -254,7 +335,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
       const minQty = Number(item.minQuantity) || 1;
       const cartItemId = cartItems[itemKey]?.cartItemId;
       console.log(cartItemId, 'cartItemId---decrease-quantity');
-      
+
 
       if (currentQty <= minQty) {
         // Remove item from cart
@@ -279,7 +360,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
           quantity: newQty,
         }
         console.log(body, 'body---decrease-quantity');
-        
+
 
         // await updateCartItemQuantity(cartData?.id, cartItemId, newQty);
 
@@ -305,7 +386,6 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
     }
   };
 
-
   const renderHeader = () => {
     if (!menuDetails) return null;
 
@@ -317,7 +397,7 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
         <View style={styles.timingContainer}>
           <Text style={styles.timingTitle}>Menu Time:</Text>
           <Text style={styles.timingText}>
-            {formatTime(menuDetails?.startTime)} - {formatTime(menuDetails?.endTime)}
+            {formatTime(menuDetails?.defaultStartTime)} - {formatTime(menuDetails?.defaultEndTime)}
           </Text>
         </View>
       </View>
@@ -351,14 +431,15 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
           source={{
             uri: `data:image/png;base64,${item?.item?.image}`
           }}
-          style={menuCardStyles.image}
+          style={menuCardStyles?.image}
           resizeMode="cover"
+          alt='Item Image'
         />
       );
     }
     return (
       <View style={[menuCardStyles.image, menuCardStyles.noImage]}>
-        <Text style={menuCardStyles.noImageText}>No Image</Text>
+        <Text style={menuCardStyles.noImageText}>Item Image</Text>
       </View>
     );
   };
@@ -378,17 +459,9 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
     );
   };
 
-  console.log(cartItems, 'cartItems---menudetails');
-  console.log(menuDetails, 'menuDetails---menudetails');
-  console.log(cartData, 'cartData---menudetails');
-
   const handleGotocart = () => {
-    console.log('Go to cart button pressed');
     navigation.navigate('CartScreen' as never);
-    console.log('Navigating to CartScreen');
-    
   }
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -417,11 +490,13 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
           const itemInCart = cartItems[itemId];
 
           const quantity = itemInCart?.quantity || 0;
+          console.log(item,"item---menuItemDetails");
+          
 
           return (
             <View style={[styles.itemContainer, { width: ITEM_WIDTH }]}>
               <View style={menuCardStyles.card}>
-                {renderImage(item)}
+                {/* {item?.item?.image && renderImage(item)} */}
                 <View style={menuCardStyles.contentContainer}>
                   <View style={menuCardStyles.nameContainer}>
                     <Text style={menuCardStyles.name}>{item?.item?.name}</Text>
@@ -467,16 +542,16 @@ const MenuItemDetails: React.FC<MenuItemDetailsProps> = ({ navigation }) => {
         }}
       />
 
-      <TouchableOpacity>
+      {/* <TouchableOpacity>
         <Text style={styles.loadingText}>Loading menu items...</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {Object.keys(cartItems).length > 0 && (
         <TouchableOpacity
           style={styles.goToCartButton}
-        onPress={handleGotocart}
+          onPress={handleGotocart}
         >
-          <Text style={styles.goToCartButtonText}>Go to Cart</Text>   
+          <Text style={styles.goToCartButtonText}>Go to Cart</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>

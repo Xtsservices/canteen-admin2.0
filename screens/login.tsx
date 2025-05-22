@@ -13,6 +13,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { Login, ResendOtp, VerifyOtp } from './services/restApi';
+// import MenuTestScreen from './offline/models/menuTestScreen';
 
 type RootStackParamList = {
   SelectCanteen: undefined;
@@ -84,11 +85,20 @@ const LoginScreen = () => {
     }
     setLoading(true);
     try {
-      const response = await fetch(Login(), {
+      // Log the URL to verify it's correct
+      const url = "https://server.welfarecanteen.in/api/login"; // Replace with your actual URL
+      console.log('Calling API URL:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ mobile: phoneNumber }),
       });
+
+      console.log('Response status:', response.status);
 
       if (response.ok) {
         showToast('success', 'OTP sent successfully.');
@@ -96,15 +106,50 @@ const LoginScreen = () => {
         setTimer(60);
         setShowResend(false);
       } else {
-        showToast('error', 'Failed to send OTP. Try again.');
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        showToast('error', `Failed to send OTP: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Send OTP Error:', error);
-      showToast('error', 'Network error. Could not connect to server.');
+    } catch (error: any) {
+      console.error('Send OTP Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      showToast('error', `Network error: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
+
+  // const sendOtp = async () => {
+  //   if (!validatePhoneNumber(phoneNumber)) {
+  //     showToast('error', 'Invalid phone number. Enter a valid 10-digit number.');
+  //     return;
+  //   }
+  //   setLoading(true);
+  //   try {
+  //     const response = await fetch(Login(), {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ mobile: phoneNumber }),
+  //     });
+
+  //     if (response.ok) {
+  //       showToast('success', 'OTP sent successfully.');
+  //       setOtpSent(true);
+  //       setTimer(60);
+  //       setShowResend(false);
+  //     } else {
+  //       showToast('error', 'Failed to send OTP. Try again.');
+  //     }
+  //   } catch (error) {
+  //     console.error('Send OTP Error:', error);
+  //     showToast('error', 'Network error. Could not connect to server.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const verifyOtp = async () => {
     const enteredOtp = otp.join('');
@@ -127,7 +172,6 @@ const LoginScreen = () => {
       if (response.ok) {
         console.log('Token:', data.token, data);
         showToast('success', 'OTP verified successfully.');
-
         navigation.navigate('AdminDashboard');
         await AsyncStorage.setItem('authorization', data.token);
       } else {
@@ -168,12 +212,9 @@ const LoginScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Image
-          source={{
-            uri: 'https://www.joinindiannavy.gov.in/images/octaginal-crest.png',
-          }}
-          style={styles.logo}
-        />
+        <Text style={{ color: '#fff', fontSize: 30, marginTop: 20 }}>
+          Welfare Canteen
+        </Text>
       </View>
 
       <Text style={styles.title}>Login or Sign up</Text>
@@ -254,6 +295,9 @@ const LoginScreen = () => {
       )}
 
       <Text style={styles.poweredBy}>Powered by WorldTech.in</Text>
+      <View>
+        {/* <MenuTestScreen/> */}
+      </View>
     </View>
   );
 };
@@ -289,8 +333,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logo: {
-    width: 150,
-    height: 150,
+    width: 400,
+    height: 250,
+    marginTop: -20,
+    marginBottom: -20,
   },
   title: {
     fontSize: 18,
